@@ -1,0 +1,104 @@
+services:
+#Service frontend
+  frontend:
+    env_file: ${ENV_FILE} #Fichier avec les variables d'environnement
+    build: 
+      context: ./frontend #Créé l'image à partir du fichier dans le dossier frontend
+      target: ${ENV} #Alias à cibler dans le Dockerfile
+    ports:
+      - "8081:${FRONT_PORT}" #Port hôte:container
+    #Condition de démarrage du service
+    depends_on:
+      backend:
+        condition: service_started #Démarre si backend est démarré
+    networks:
+      - network_tp_network #Réseau mappé
+
+#Service backend
+  backend:
+    env_file: ${ENV_FILE} #Fichier avec les variables d'environnement
+    build: 
+      context: ./backend #Créé l'image à partir du fichier dans le dossier backend
+    ports:
+      - "5000:${BACK_PORT}" #Port hôte:container
+    #Variables d'environnement
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    networks:
+      - network_tp_network
+    #Condition de démarrage du service
+    depends_on:
+      mysql_migration: 
+        condition: service_completed_successfully
+
+#Service serveur MySQL
+  mysql:
+    image: mysql:latest
+    env_file: ".env" #Fichier avec les variables d'environnement
+    #Variables d'environnement
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306" #Port hôte:container
+    #Volumes en points de montage
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/data.db:/docker-entrypoint-initdb.d/data.db
+    #Vérification de l'état du service
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - network_tp_network #Réseau mappé
+
+#Service migration BDD
+  mysql_migration:
+      build: ./backend
+      command: 
+        - sh
+        - -c
+        - "flask db upgrade"
+      env_file: ".env" #Fichier avec les variables d'environnement
+      #Condition de démarrage du service
+      depends_on:
+        mysql:
+          condition: service_healthy
+      networks:
+        - network_tp_network #Réseau mappé
+
+#Service SGBD
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: pma-tp
+    env_file: ".env" #Fichier avec les variables d'environnement
+    #Variables d'environnement
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: "3306"
+      PMA_USER: ${MYSQL_USER}
+      PMA_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8080:80" #Port hôte:container
+    #Condition de démarrage du service
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - network_tp_network
+
+#Réseau sur lequel mapper les containers
+networks:
+  network_tp_network: 
+    name: network_tp_network
+    driver: bridge
+
+#Volumes
+volumes:
+  mysql_data:
