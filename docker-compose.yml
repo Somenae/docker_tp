@@ -35,7 +35,7 @@ services:
 #Service serveur MySQL
   mysql:
     image: mysql:latest
-    env_file: ".env" #Fichier avec les variables d'environnement
+    env_file: ${ENV_FILE} #Fichier avec les variables d'environnement
     #Variables d'environnement
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -64,7 +64,7 @@ services:
         - sh
         - -c
         - "flask db upgrade"
-      env_file: ".env" #Fichier avec les variables d'environnement
+      env_file: ${ENV_FILE} #Fichier avec les variables d'environnement
       #Condition de démarrage du service
       depends_on:
         mysql:
@@ -76,7 +76,7 @@ services:
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     container_name: pma-tp
-    env_file: ".env" #Fichier avec les variables d'environnement
+    env_file: ${ENV_FILE} #Fichier avec les variables d'environnement
     #Variables d'environnement
     environment:
       PMA_HOST: mysql
